@@ -1,0 +1,12 @@
+{
+  "0.1.2": {
+	"0.1.3": "https://github/repo/patches/0.1.2to0.1.3.zip"
+  },
+  "0.1.1": {
+	"0.1.2": "https://github/repo/patches/0.1.1to0.1.2.zip"
+  },
+  "0.1.0": {
+	"0.1.1": "https://github/repo/patches/0.1.0to0.1.1.zip",
+	"0.1.3": "https://github/repo/patches/0.1.0to0.1.3.zip"
+  }
+}
