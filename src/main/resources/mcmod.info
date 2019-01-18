@@ -1,0 +1,16 @@
+[
+{
+  "modid": "deltapatcher",
+  "name": "Delta Patcher",
+  "description": "A small mod to allow easy creation of auto-updaters",
+  "version": "${version}",
+  "mcversion": "${mcversion}",
+  "url": "_Programatically_generated",
+  "updateJSON": "https://github.com/Cadiboo/Delta-Patcher/update.json",
+  "authorList": ["Cadiboo"],
+  "credits": "The Forge and FML guys for Forge and FML and Cadiboo for making the mod",
+  "logoFile": "",
+  "screenshots": [],
+  "dependencies": []
+}
+]
