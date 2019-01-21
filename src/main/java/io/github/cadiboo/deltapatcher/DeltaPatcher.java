@@ -1,6 +1,5 @@
 package io.github.cadiboo.deltapatcher;
 
-import com.google.common.collect.Sets;
 import com.google.common.io.ByteStreams;
 import com.google.gson.Gson;
 import net.minecraftforge.common.ForgeVersion;
@@ -19,17 +18,17 @@ import java.net.URI;
 import java.net.URL;
 import java.net.URLConnection;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.FileSystem;
+import java.nio.file.FileSystems;
 import java.nio.file.Files;
+import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.util.HashSet;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
-import java.util.zip.ZipInputStream;
+import java.util.stream.Stream;
 
-import static java.nio.file.StandardOpenOption.READ;
 import static net.minecraftforge.common.ForgeVersion.CheckResult;
 
 /**
@@ -39,69 +38,101 @@ import static net.minecraftforge.common.ForgeVersion.CheckResult;
 public class DeltaPatcher {
 
 	private static final Logger LOGGER = LogManager.getLogger("deltapatcher");
-//	static {
-//		try {
-//			process("deltapatcher", "0.1.0", "https://raw.githubusercontent.com/Cadiboo/Delta-Patcher/master/patches");
-//		} catch (IOException e) {
-//			e.printStackTrace();
-//		}
-//	}
 
 	public static void main(String... args) throws Exception {
-//		Delta.main(args);
 
-		final ZipFile source = new ZipFile("/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre7.jar");
-		final ZipFile target = new ZipFile("/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre6.jar");
+		final File source = Paths.get("/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre7.jar").toFile();
+		final File target = Paths.get("/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre6.jar").toFile();
 		final File generatedDiff = Paths.get("/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre6to1.12.2-0.3.0-pre7.zip").toFile();
 
-		final ZipInputStream sourceZipInputStream = new ZipInputStream(Files.newInputStream(source., READ));
-		final ZipInputStream targetZipInputStream = new ZipInputStream(Files.newInputStream(target.toPath(), READ));
+		// locate file system by using the syntax defined in java.net.JarURLConnection
+		final URI sourceUri = URI.create("jar:" + source.toURI().toString());
+		final URI targetUri = URI.create("jar:" + target.toURI().toString());
+
+		final Map<String, String> env = new HashMap<>();
+		env.put("create", "false");
+
+		final FileSystem sourceZipFileSystem = FileSystems.newFileSystem(sourceUri, env);
+		final FileSystem targetZipFileSystem = FileSystems.newFileSystem(targetUri, env);
+
 		generatedDiff.getParentFile().mkdirs();
-		final ZipInputStream generatedDiffZipInputStream = new ZipInputStream(Files.newInputStream(generatedDiff.toPath(), READ));
+		//why jar not zip? idk, documentation seems to be out of date & using a path in the params doesn't work
+		final URI generatedDiffUri = URI.create("jar:" + generatedDiff.toURI().toString());
+		final Map<String, String> createEnv = new HashMap<>();
+		createEnv.put("create", "true");
+		final FileSystem generatedDiffZipFileSystem = FileSystems.newFileSystem(generatedDiffUri, createEnv, null);
 
-		final HashSet<String> targetFileNames = Sets.newHashSet();
-		final HashSet<ZipEntry> targetZipEntries = Sets.newHashSet();
-		{
-			ZipEntry zipEntry;
-			while ((zipEntry = targetZipInputStream.getNextEntry()) != null) {
-				if (zipEntry.isDirectory()) {
-					continue;
+		final Path sourceRoot = sourceZipFileSystem.getPath("/");
+		final Path targetRoot = targetZipFileSystem.getPath("/");
+		final Path generatedDiffRoot = generatedDiffZipFileSystem.getPath("/");
+
+		Files.walk(targetRoot).forEach(file -> {
+			final Path pathInSourceJar = sourceRoot.resolve(targetRoot.relativize(file).toString());
+			final Path pathInTargetJar = file.toAbsolutePath();
+			final Path pathInGeneratedDiffZip = generatedDiffRoot.resolve(targetRoot.relativize(file).toString());
+			final Path fullPathInSourceJar = source.toPath().resolve(sourceRoot.relativize(pathInSourceJar).toString());
+			final Path fullPathInTargetJar = target.toPath().resolve(targetRoot.relativize(pathInTargetJar).toString());
+			final Path fullPathInGeneratedDiffZip = generatedDiff.toPath().resolve(generatedDiffRoot.relativize(pathInGeneratedDiffZip).toString());
+
+			System.out.println(pathInSourceJar);
+			System.out.println(pathInTargetJar);
+			System.out.println(pathInGeneratedDiffZip);
+			System.out.println(fullPathInSourceJar);
+			System.out.println(fullPathInTargetJar);
+			System.out.println(fullPathInGeneratedDiffZip);
+
+			try {
+				if (Files.isDirectory(fullPathInSourceJar)) {
+					Files.createDirectories(pathInGeneratedDiffZip);
+				} else {
+					Files.copy(fullPathInSourceJar, pathInGeneratedDiffZip);
 				}
-				targetFileNames.add(zipEntry.getName());
-				targetZipEntries.add((ZipEntry) zipEntry.clone());
+			} catch (IOException e) {
+				e.printStackTrace();
 			}
+
+		});
+
+	}
+
+	void s() throws Throwable {
+		File zip = null;
+		Path contents = null;
+
+		final Map<String, String> env = new HashMap<>();
+		//creates a new Zip file rather than attempting to read an existing one
+		env.put("create", "true");
+		// locate file system by using the syntax
+		// defined in java.net.JarURLConnection
+		final URI uri = URI.create("jar:file:/" + zip.toString().replace("\\", "/"));
+		try (final FileSystem zipFileSystem = FileSystems.newFileSystem(uri, env);
+		     final Stream<Path> files = Files.walk(contents)) {
+			final Path root = zipFileSystem.getPath("/");
+			files.forEach(file -> {
+				try {
+					copyToZip(root, contents, file);
+				} catch (IOException e) {
+					throw new RuntimeException(e);
+				}
+			});
 		}
+	}
 
-		ZipEntry zipEntry;
-		while ((zipEntry = sourceZipInputStream.getNextEntry()) != null) {
-			if (zipEntry.isDirectory()) {
-				continue;
-			}
-			System.out.println(zipEntry);
-			System.out.println(targetFileNames.contains(zipEntry.getName()));
-
-			args = new String[]{
-					source.getI,
-					Paths.get(target.getName(), zipEntry.getName()).toString(),
-					Paths.get(generatedDiff.getName(), zipEntry.getName()).toString(),
-			};
-
-			Delta.main(args);
-
+	/**
+	 * Copy a specific file/folder to the zip archive
+	 * If the file is a folder, create the folder. Otherwise copy the file
+	 *
+	 * @param root     the root of the zip archive
+	 * @param contents the root of the directory tree being copied, for relativization
+	 * @param file     the specific file/folder to copy
+	 */
+	private static void copyToZip(final Path root, final Path contents, final Path file) throws IOException {
+		final Path to = root.resolve(contents.relativize(file).toString());
+		if (Files.isDirectory(file)) {
+			Files.createDirectories(to);
+		} else {
+			Files.copy(file, to);
 		}
-
-		sourceZipInputStream.close();
-		targetZipInputStream.close();
-
-		System.exit(0);
-
-		args = new String[]{
-				"/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre7.jar",
-				"/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre6.jar",
-				"/Users/Cadiboo/Desktop/diffs/RenderChunk-rebuildChunk-Hooks-1.12.2-0.3.0-pre6to1.12.2-0.3.0-pre7.zip",
-		};
-
-		Delta.main(args);
 	}
 
 	private static final int MAX_HTTP_REDIRECTS = 20;
