@@ -82,10 +82,10 @@ public class DeltaPatcher {
 			System.out.println(fullPathInGeneratedDiffZip);
 
 			try {
-				if (Files.isDirectory(fullPathInSourceJar)) {
+				if (Files.isDirectory(file)) {
 					Files.createDirectories(pathInGeneratedDiffZip);
 				} else {
-					Files.copy(fullPathInSourceJar, pathInGeneratedDiffZip);
+					Files.copy(file, pathInGeneratedDiffZip);
 				}
 			} catch (IOException e) {
 				e.printStackTrace();
